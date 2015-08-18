@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# restore maven dependencies downloaded in a previous build,
+# so they do not have to be downloaded again.
+# /tmp/artifacts will only be present in the incremental build scenario
+# in which the target image name is an existing docker image which contains
+# dependencies from a prior build execution.
+function restore_saved_artifacts() {
+  if [ -d /tmp/artifacts/ ]; then
+    echo -n "Restoring saved artifacts from prior build..."
+    mv /tmp/artifacts/.m2 ${HOME}/.
+  else 
+    echo -n "Can't find saved artifacts. Ignoring..."
+  fi
+}
+
+# Source code provided to STI is at ${HOME}/source
+LOCAL_SOURCE_DIR=${HOME}/source
+mkdir -p ${LOCAL_SOURCE_DIR}
+
+# The dir that contains the build output
+if [ -z "${OUTPUT_DIR}" ]; then
+  OUTPUT_DIR="${LOCAL_SOURCE_DIR}/target"
+elif [[ ${OUTPUT_DIR} != /* ]]; then
+  OUTPUT_DIR="${LOCAL_SOURCE_DIR}/${OUTPUT_DIR}"
+fi
+
+# Output will result in /opt/jboss folder
+DEPLOY_DIR=/opt/jboss
+mkdir -p ${DEPLOY_DIR}
+
+# Copy the source for compilation
+cp -ad /tmp/src/* ${LOCAL_SOURCE_DIR}
+
+# If a pom.xml is present, this is a normal build scenario
+# so run maven.
+if [ -f "${LOCAL_SOURCE_DIR}/pom.xml" ]; then
+  # restore any maven dependencies which will be present if this is an
+  # incremental build
+  restore_saved_artifacts
+
+  pushd ${LOCAL_SOURCE_DIR} &> /dev/null
+  JAVA_HOME=/etc/alternatives/java_sdk_1.7.0
+
+  if [ -z "${MAVEN_ARGS}" ]; then
+    MAVEN_ARGS="package org.jboss.hawt.boot:hawt-boot-maven-plugin:1.0-SNAPSHOT:build -DskipTests -e"
+  fi
+  echo "Found pom.xml... attempting to build with 'mvn ${MAVEN_ARGS}'"
+
+  mvn --version
+  mvn ${MAVEN_ARGS} ${MAVEN_DEBUG_ARGS}
+
+  ERR=$?
+  if [ ${ERR} -ne 0 ]; then
+    echo "Aborting due to error code ${ERR} from mvn command"
+    exit ${ERR}
+  fi
+
+  echo "Copying built artifacts from ${OUTPUT_DIR} into ${DEPLOY_DIR}..."
+  popd &> /dev/null
+else
+  if [ -z "${OUTPUT_DIR}" ]; then
+    OUTPUT_DIR="${LOCAL_SOURCE_DIR}"
+  fi
+  echo "Copying binaries in source directory into ${DEPLOY_DIR}..."
+fi
+
+# locate karaf4 assembly
+if [ -z "${HAWTAPP_ASSEMBLY}" ]; then
+  pushd ${OUTPUT_DIR} &> /dev/null
+  HAWTAPP_ASSEMBLY=`ls -1 *-app.tar.gz`
+  if [ ! -f ${HAWTAPP_ASSEMBLY} ]; then
+    echo "Missing assembly archive file *-app.tar.gz in ${OUTPUT_DIR}"
+    exit 1
+  fi
+  popd &> /dev/null
+fi
+HAWTAPP_ASSEMBLY_ARCHIVE=${OUTPUT_DIR}/${HAWTAPP_ASSEMBLY}
+if [ ! -f "${HAWTAPP_ASSEMBLY_ARCHIVE}" ]; then
+  echo "Missing assembly archive file ${HAWTAPP_ASSEMBLY_ARCHIVE}"
+  exit 1
+fi
+
+# extract custom assembly to DEPLOY_DIR
+tar xzf "$HAWTAPP_ASSEMBLY_ARCHIVE" -C /opt/jboss
+HAWTAPP_ASSEMBLY_DIR=${HAWTAPP_ASSEMBLY_ARCHIVE%.tar.gz}
+ln -s "${DEPLOY_DIR}/${HAWTAPP_ASSEMBLY_DIR##*/}" "${DEPLOY_DIR}/hawt-app"
+
+# cleanup maven build artifacts to reduce image size
+if [ -f "${LOCAL_SOURCE_DIR}/pom.xml" ]; then
+  pushd ${LOCAL_SOURCE_DIR} &> /dev/null
+  mvn clean
+  rm .mvn.out .mvn.props
+  popd
+fi
+
+echo "...done"
