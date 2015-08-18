@@ -1,7 +1,7 @@
 FROM fabric8/base-sti
 
 MAINTAINER Dhiraj Bokde <dhirajsb@gmail.com>
-LABEL io.k8s.description="Platform for building and running Karaf4 based applications" \
+LABEL io.k8s.description="Platform for building and running Hawt App applications" \
             io.k8s.display-name="HawtApp" \
 # users will expose using oc commands
 #            io.openshift.expose-services="8080:http" \
