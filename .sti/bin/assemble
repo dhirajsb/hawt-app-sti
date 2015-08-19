@@ -43,7 +43,7 @@ if [ -f "${LOCAL_SOURCE_DIR}/pom.xml" ]; then
   JAVA_HOME=/etc/alternatives/java_sdk_1.7.0
 
   if [ -z "${MAVEN_ARGS}" ]; then
-    MAVEN_ARGS="package org.jboss.hawt.boot:hawt-boot-maven-plugin:1.0-SNAPSHOT:build -DskipTests -e"
+    MAVEN_ARGS="package hawt-app:build -DskipTests -e"
   fi
   echo "Found pom.xml... attempting to build with 'mvn ${MAVEN_ARGS}'"
 
@@ -90,7 +90,6 @@ ln -s "${DEPLOY_DIR}/${HAWTAPP_ASSEMBLY_DIR##*/}" "${DEPLOY_DIR}/hawt-app"
 if [ -f "${LOCAL_SOURCE_DIR}/pom.xml" ]; then
   pushd ${LOCAL_SOURCE_DIR} &> /dev/null
   mvn clean
-  rm .mvn.out .mvn.props
   popd
 fi
 

@@ -28,7 +28,7 @@ It may be possible that the maven build needs to be customized. For example:
 The `MAVEN_ARGS` environment variable can be set to change the behaviour. By
 default `MAVEN_ARGS` is set to:
 
-  package org.jboss.hawt.boot:hawt-boot-maven-plugin:1.0-SNAPSHOT:build -DskipTests -e
+  package hawt-app:build -DskipTests -e
 
 You can override the `MAVEN_ARGS` like in the example below we tell maven to just build the project with groupId "some.groupId" and artifactId "some.artifactId" and all its module dependencies.
 
